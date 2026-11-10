@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Baker's Dozen</title>
+<link rel="icon" href="/static/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Colors pulled from the logo */
+  :root {
+    --blue: #8aa9f8;
+    --lilac: #b894e0;
+    --pink: #e66bb8;
+    --flour: #f7efe6;
+    --plum: #4a2a63;
+    --plum-soft: #7a5a90;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    font-family: "Poppins", system-ui, sans-serif;
+    color: #fff;
+    background: radial-gradient(circle at 50% 42%, var(--pink) 0%, var(--lilac) 52%, var(--blue) 100%) fixed;
+  }
+  main { max-width: 640px; margin: 0 auto; padding: 28px 20px 120px; }
+  h2 { font-size: 1.5rem; font-weight: 700; margin: 8px 0 4px; }
+  p { line-height: 1.5; }
+
+  /* Home: the prompt sits in the middle until there are results */
+  .home { min-height: calc(100vh - 150px); display: flex; flex-direction: column; justify-content: center; text-align: center; }
+  .home.searched { justify-content: flex-start; }
+  .logo { width: 132px; height: 132px; border-radius: 32px; margin: 0 auto 18px; display: block; box-shadow: 0 10px 30px rgba(74, 42, 99, .35); }
+  .home.searched .logo { width: 72px; height: 72px; border-radius: 20px; }
+  .prompt { display: flex; gap: 8px; background: var(--flour); border-radius: 999px; padding: 6px; margin: 20px 0 14px; box-shadow: 0 8px 24px rgba(74, 42, 99, .25); }
+  .prompt input { flex: 1; min-width: 0; border: 0; background: transparent; font: inherit; font-size: 1rem; color: var(--plum); padding: 10px 16px; outline: none; }
+  .prompt input::placeholder { color: var(--plum-soft); }
+  .prompt:focus-within { outline: 3px solid #fff; outline-offset: 2px; }
+  .go { border: 0; border-radius: 999px; padding: 10px 20px; font: inherit; font-weight: 600; color: #fff; background: var(--plum); cursor: pointer; }
+  .go:disabled { opacity: .6; cursor: wait; }
+  .status { min-height: 1.5em; margin: 6px 0 14px; font-weight: 500; }
+  .loading { animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .55; } }
+
+  /* Recipe cards: flour-colored so the plum text stays readable */
+  .results, .list { text-align: left; }
+  .card { display: flex; align-items: stretch; background: var(--flour); color: var(--plum); border-radius: 20px; margin: 10px 0; box-shadow: 0 6px 18px rgba(74, 42, 99, .2); overflow: hidden; }
+  .card-link { flex: 1; min-width: 0; padding: 14px 8px 14px 18px; color: inherit; text-decoration: none; }
+  .card-link strong { display: block; font-weight: 600; line-height: 1.3; }
+  .card-link:hover strong { text-decoration: underline; }
+  .meta { color: var(--plum-soft); font-size: .85rem; margin-top: 4px; }
+  .star { border: 0; background: transparent; font-size: 1.6rem; padding: 0 18px; color: var(--plum-soft); cursor: pointer; }
+  .star[aria-pressed="true"] { color: var(--pink); }
+  .card-link:focus-visible, .star:focus-visible, nav button:focus-visible, .go:focus-visible, .text-btn:focus-visible { outline: 3px solid var(--plum); outline-offset: -3px; }
+  .search-row { width: 100%; text-align: left; border: 0; font: inherit; cursor: pointer; padding: 14px 18px; background: var(--flour); color: var(--plum); border-radius: 20px; margin: 8px 0; font-weight: 500; }
+  .text-btn { border: 2px solid #fff; background: transparent; color: #fff; font: inherit; font-weight: 600; border-radius: 999px; padding: 8px 18px; cursor: pointer; margin-top: 12px; }
+  .note { background: var(--flour); color: var(--plum); border-radius: 20px; padding: 18px; }
+
+  /* Bottom tabs */
+  nav { position: fixed; left: 0; right: 0; bottom: 0; display: flex; justify-content: center; gap: 4px; padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px)); background: rgba(74, 42, 99, .72); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+  nav button { flex: 1; max-width: 150px; border: 0; background: transparent; color: #fff; font: inherit; font-size: .72rem; font-weight: 500; padding: 8px 4px; border-radius: 16px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  nav button span { font-size: 1.25rem; line-height: 1; }
+  nav button[aria-selected="true"] { background: var(--flour); color: var(--plum); font-weight: 600; }
+  @media (prefers-reduced-motion: reduce) { .loading { animation: none; } }
+</style>
+</head>
+<body>
+<main>
+  <section class="tab home" id="tab-home">
+    <img class="logo" src="/static/logo.png" alt="Baker's Dozen logo">
+    <h2>What do you want to use up?</h2>
+    <p>Type your ingredients, separated by commas.</p>
+    <div class="prompt">
+      <input id="ingredients" placeholder="e.g. chocolate, strawberries" autocomplete="off" aria-label="Ingredients">
+      <button class="go" id="go">Find recipes</button>
+    </div>
+    <p class="status" id="status" role="status"></p>
+    <div class="results" id="results"></div>
+  </section>
+
+  <section class="tab" id="tab-favorites" hidden>
+    <h2>Favorites</h2>
+    <div class="list" id="favorites-list"></div>
+  </section>
+
+  <section class="tab" id="tab-history" hidden>
+    <h2>History</h2>
+    <h3>Recent searches</h3>
+    <div class="list" id="searches-list"></div>
+    <h3>Recipes you opened</h3>
+    <div class="list" id="clicks-list"></div>
+    <button class="text-btn" id="clear-history">Clear history</button>
+  </section>
+
+  <section class="tab" id="tab-assistant" hidden>
+    <h2>AI Assistant</h2>
+    <div class="note">
+      <p><strong>Coming soon.</strong> Ask for cooking tips and convert measurements here.</p>
+    </div>
+  </section>
+</main>
+
+<nav aria-label="Main">
+  <button data-tab="home" aria-selected="true"><span aria-hidden="true"></span>Ingredient Help</button>
+  <button data-tab="favorites" aria-selected="false"><span aria-hidden="true"></span>Favorites</button>
+  <button data-tab="history" aria-selected="false"><span aria-hidden="true"></span>History</button>
+  <button data-tab="assistant" aria-selected="false"><span aria-hidden="true"></span>AI Assistant</button>
+</nav>
+
+<script>
+  // Helpers
+  const $ = (id) => document.getElementById(id);
+
+  // Saved data lives in this browser's localStorage for now (no accounts yet)
+  const store = {
+    get(key) { try { return JSON.parse(localStorage.getItem(key)) || []; } catch (e) { return []; } },
+    set(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {} }
+  };
+  const KEYS = { favs: "bd_favorites", clicks: "bd_clicks", searches: "bd_searches" };
+
+  // Build elements with textContent so text from other sites can never run as code
+  function el(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+  function host(url) {
+    try { return new URL(url).hostname.replace("www.", ""); } catch (e) { return ""; }
+  }
+  function metaText(r) {
+    const site = host(r.url);
+    if (r.stars) return r.stars + " \u2605 from " + r.reviews + " ratings, " + site;
+    return site;
+  }
+
+  // Tabs
+  const tabButtons = document.querySelectorAll("nav button");
+  function showTab(name) {
+    tabButtons.forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === name)));
+    document.querySelectorAll("section.tab").forEach((s) => { s.hidden = s.id !== "tab-" + name; });
+    if (name === "favorites") renderFavorites();
+    if (name === "history") renderHistory();
+    window.scrollTo(0, 0);
+  }
+  tabButtons.forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
+
+  // Favorites
+  const isFav = (url) => store.get(KEYS.favs).some((f) => f.url === url);
+  function toggleFav(r) {
+    let favs = store.get(KEYS.favs);
+    if (favs.some((f) => f.url === r.url)) favs = favs.filter((f) => f.url !== r.url);
+    else favs.unshift({ url: r.url, title: r.title, stars: r.stars, reviews: r.reviews });
+    store.set(KEYS.favs, favs);
+  }
+
+  // History
+  function logClick(r) {
+    const clicks = store.get(KEYS.clicks).filter((c) => c.url !== r.url);
+    clicks.unshift({ url: r.url, title: r.title, stars: r.stars, reviews: r.reviews });
+    store.set(KEYS.clicks, clicks.slice(0, 50));
+  }
+  function logSearch(text) {
+    const searches = store.get(KEYS.searches).filter((s) => s !== text);
+    searches.unshift(text);
+    store.set(KEYS.searches, searches.slice(0, 30));
+  }
+
+  // One recipe card: the title opens the recipe, the star saves it
+  function recipeCard(r) {
+    const card = el("div", "card");
+    const link = el("a", "card-link");
+    link.href = r.url;
+    link.target = "_blank";
+    link.rel = "noopener";
+    link.append(el("strong", "", r.title || host(r.url)), el("div", "meta", metaText(r)));
+    link.addEventListener("click", () => logClick(r));
+
+    const star = el("button", "star", isFav(r.url) ? "\u2605" : "\u2606");
+    star.setAttribute("aria-pressed", String(isFav(r.url)));
+    star.setAttribute("aria-label", "Save to Favorites");
+    star.addEventListener("click", () => {
+      toggleFav(r);
+      const on = isFav(r.url);
+      star.textContent = on ? "\u2605" : "\u2606";
+      star.setAttribute("aria-pressed", String(on));
+      if (!$("tab-favorites").hidden) renderFavorites();
+    });
+    card.append(link, star);
+    return card;
+  }
+
+  function fillList(container, items, makeNode, emptyText) {
+    container.replaceChildren();
+    if (items.length === 0) container.append(el("div", "note", emptyText));
+    else items.forEach((item) => container.append(makeNode(item)));
+  }
+  function renderFavorites() {
+    fillList($("favorites-list"), store.get(KEYS.favs), recipeCard, "No favorites yet. Tap the star on a recipe to save it here.");
+  }
+  function renderHistory() {
+    fillList($("searches-list"), store.get(KEYS.searches), (text) => {
+      const row = el("button", "search-row", text);
+      row.addEventListener("click", () => { $("ingredients").value = text; showTab("home"); search(); });
+      return row;
+    }, "No searches yet.");
+    fillList($("clicks-list"), store.get(KEYS.clicks), recipeCard, "Recipes you open will show up here.");
+  }
+  $("clear-history").addEventListener("click", () => {
+    store.set(KEYS.searches, []);
+    store.set(KEYS.clicks, []);
+    renderHistory();
+  });
+
+  // Search: ask the Flask server for recipes
+  const input = $("ingredients");
+  const button = $("go");
+  const status = $("status");
+  const results = $("results");
+
+  async function search() {
+    const text = input.value.trim();
+    if (!text) { status.textContent = "Type at least one ingredient."; return; }
+
+    status.textContent = "Searching trusted recipe sites. This can take up to 40 seconds.";
+    status.classList.add("loading");
+    results.replaceChildren();
+    button.disabled = true;
+    $("tab-home").classList.add("searched");
+
+    try {
+      const response = await fetch("/api/recipes?ingredients=" + encodeURIComponent(text));
+      const recipes = await response.json();
+      if (!response.ok) { status.textContent = recipes.error || "Something went wrong. Try again."; return; }
+      if (recipes.length === 0) { status.textContent = "No recipes matched all of those ingredients. Try fewer ingredients."; return; }
+
+      logSearch(text);
+      status.textContent = "Found " + recipes.length + (recipes.length === 1 ? " recipe:" : " recipes:");
+      recipes.forEach((r) => results.append(recipeCard(r)));
+    } catch (e) {
+      status.textContent = "Can't reach the server. Make sure app.py is running.";
+    } finally {
+      status.classList.remove("loading");
+      button.disabled = false;
+    }
+  }
+  button.addEventListener("click", search);
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") search(); });
+</script>
+</body>
+</html>
