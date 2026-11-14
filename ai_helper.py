@@ -133,6 +133,34 @@ def score(stars, count):
     weight = 50     # how many reviews it takes to trust a rating
     return (count / (count + weight)) * stars + (weight / (count + weight)) * average
 
+SUGGESTION_CACHE = {}
+
+def get_suggestions(ingredients):
+    items = [i.strip() for i in ingredients.split(",") if i.strip()]
+    if len(items) != 1:
+        return []
+    term = items[0].lower()
+    if term in SUGGESTION_CACHE:
+        return SUGGESTION_CACHE[term]
+
+    try:
+        reply = client.models.generate_content(
+            model="gemini-3-flash-preview",
+            contents=(
+                "A home cook typed the ingredient \"" + term + "\" into a recipe search. "
+                "List up to 6 specific forms/varieties of this ingredient and what they mean."
+                "(for example, for coconut: coconut milk, coconut cream, coconut oil, shredded coconut)."
+                "Reply with a comma-separated list of the ingredient forms only (no recipes/dishes)."
+            ),
+        )
+        ideas = [s.strip().lower() for s in reply.text.split(",")]
+    except Exception:
+        return [] # If gemini doesn't respond, the search still works
+
+    ideas = [s for s in ideas if re.fullmatch(r"[a-z '\-]{2,40}", s) and s != term][:6] # Keeps plain short phrases
+    SUGGESTION_CACHE[term] = ideas
+    return ideas
+
 CACHE = {}
 CACHE_SECONDS = 3600  # cache results for 1 hour
 
@@ -141,7 +169,7 @@ def get_ranked_recipes(ingredients):
     key = ", ".join(sorted(i.lower() for i in items))
 
     saved = CACHE.get(key)
-    if saved and time.time() - saved[0] < CACHE_SECONDS:
+    if saved and time.time() - saved[0] < CACHE_SECONDS: # Checks that the saved result is under an hour old
         return saved[1]
 
     urls = get_candidate_urls(ingredients)
@@ -165,5 +193,5 @@ def get_ranked_recipes(ingredients):
     return recipes
 
 if __name__ == "__main__":
-    for r in get_ranked_recipes("chocolate, peanut butter"):
+    for r in get_ranked_recipes("chocolate, peanut butter")[:5]:
         print(r["stars"], r["reviews"], r["url"])
