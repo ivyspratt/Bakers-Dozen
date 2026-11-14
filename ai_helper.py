@@ -133,6 +133,9 @@ def score(stars, count):
     weight = 50     # how many reviews it takes to trust a rating
     return (count / (count + weight)) * stars + (weight / (count + weight)) * average
 
+CACHE = {}
+CACHE_SECONDS = 3600  # cache results for 1 hour
+
 def get_ranked_recipes(ingredients):
     items = [i.strip() for i in ingredients.split(",") if i.strip()]
     key = ", ".join(sorted(i.lower() for i in items))
@@ -162,5 +165,5 @@ def get_ranked_recipes(ingredients):
     return recipes
 
 if __name__ == "__main__":
-    for r in get_top_recipes("chocolate, peanut butter"):
+    for r in get_ranked_recipes("chocolate, peanut butter"):
         print(r["stars"], r["reviews"], r["url"])

@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, request, send_from_directory
 
-from ai_helper import get_top_recipes
+from ai_helper import get_ranked_recipes
 
 app = Flask(__name__) # creates the web server
 
@@ -13,7 +13,7 @@ def recipes():
     ingredients = request.args.get("ingredients", "").strip()
     if not ingredients:
         return jsonify({"error": "Please enter at least one ingredient."}), 400 # tells you the page request was bad
-    return jsonify(get_top_recipes(ingredients))
+    return jsonify(get_ranked_recipes(ingredients))
 
 if __name__ == "__main__":
     app.run(debug=True)
