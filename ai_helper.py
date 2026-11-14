@@ -5,6 +5,8 @@ from concurrent.futures import ThreadPoolExecutor
 import json
 import requests
 from bs4 import BeautifulSoup
+import time
+import re
 
 load_dotenv()
 client = genai.Client()
@@ -131,8 +133,14 @@ def score(stars, count):
     weight = 50     # how many reviews it takes to trust a rating
     return (count / (count + weight)) * stars + (weight / (count + weight)) * average
 
-def get_top_recipes(ingredients, how_many=5):
+def get_ranked_recipes(ingredients):
     items = [i.strip() for i in ingredients.split(",") if i.strip()]
+    key = ", ".join(sorted(i.lower() for i in items))
+
+    saved = CACHE.get(key)
+    if saved and time.time() - saved[0] < CACHE_SECONDS:
+        return saved[1]
+
     urls = get_candidate_urls(ingredients)
     with ThreadPoolExecutor(max_workers=8) as pool:
         infos = list(pool.map(get_recipe_info, urls))
@@ -148,7 +156,10 @@ def get_top_recipes(ingredients, how_many=5):
                 "score": score(info["stars"], info["count"]),
             })
     recipes.sort(key=lambda r: r["score"], reverse=True)
-    return recipes[:how_many]
+
+    if recipes:
+        CACHE[key] = (time.time(), recipes)
+    return recipes
 
 if __name__ == "__main__":
     for r in get_top_recipes("chocolate, peanut butter"):
