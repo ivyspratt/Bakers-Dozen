@@ -236,41 +236,102 @@
     renderHistory();
   });
 
-  // Search: ask the Flask server for recipes
+  // Search: ask the Flask server for recipes, 5 at a time
   const input = $("ingredients");
   const button = $("go");
   const status = $("status");
   const results = $("results");
+  const suggestionsBox = $("suggestions");
+  const moreButton = $("more");
+
+  let currentSearch = "";   // the search whose results are on screen
+  let nextPage = 0;         // which group of 5 to ask for next
+  let shown = 0;            // how many recipes are on screen
+  let searchId = 0;         // lets a newer search replace an older one
+
+  async function fetchPage(text, page) {
+    const response = await fetch("/api/recipes?ingredients=" + encodeURIComponent(text) + "&page=" + page);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Something went wrong. Try again.");
+    return data;
+  }
+
+  function showRecipes(data) {
+    data.recipes.forEach((r) => results.append(recipeCard(r)));
+    shown += data.recipes.length;
+    status.textContent = "Showing " + shown + " of " + data.total + (data.total === 1 ? " recipe:" : " recipes:");
+    moreButton.hidden = !data.has_more;
+  }
+
+  // Suggestions load at the same time as recipes, so they appear in a second or two
+  async function loadSuggestions(text) {
+    try {
+      const response = await fetch("/api/suggestions?ingredients=" + encodeURIComponent(text));
+      const ideas = await response.json();
+      if (text !== currentSearch || ideas.length === 0) return;
+      suggestionsBox.append(el("p", "", "Too broad? Try being more specific:"));
+      const row = el("div", "chips");
+      ideas.forEach((idea) => {
+        const chip = el("button", "chip", idea);
+        chip.addEventListener("click", () => { input.value = idea; search(); });
+        row.append(chip);
+      });
+      suggestionsBox.append(row);
+    } catch (e) {
+      // Suggestions are optional, so ignore any failure
+    }
+  }
 
   async function search() {
     const text = input.value.trim();
     if (!text) { status.textContent = "Type at least one ingredient."; return; }
 
+    const myId = ++searchId;
+    currentSearch = text;
+    nextPage = 0;
+    shown = 0;
     status.textContent = "Searching trusted recipe sites. This can take up to 40 seconds.";
     status.classList.add("loading");
     results.replaceChildren();
-    button.disabled = true;
+    suggestionsBox.replaceChildren();
+    moreButton.hidden = true;
     $("tab-home").classList.add("searched");
+    loadSuggestions(text);
 
     try {
-      const response = await fetch("/api/recipes?ingredients=" + encodeURIComponent(text));
-      const data = await response.json();
-      const recipes = data.recipes || [];
-      if (!response.ok) { status.textContent = recipes.error || "Something went wrong. Try again."; return; }
-      if (recipes.length === 0) { status.textContent = "No recipes matched all of those ingredients. Try fewer ingredients."; return; }
-
+      const data = await fetchPage(text, 0);
+      if (myId !== searchId) return;   // a newer search has started
+      if (data.total === 0) { status.textContent = "No recipes matched all of those ingredients. Try fewer or more specific ones."; return; }
       logSearch(text);
-      status.textContent = "Found " + recipes.length + (recipes.length === 1 ? " recipe:" : " recipes:");
-      recipes.forEach((r) => results.append(recipeCard(r)));
+      nextPage = 1;
+      showRecipes(data);
     } catch (e) {
-      status.textContent = "Can't reach the server. Make sure app.py is running.";
+      if (myId !== searchId) return;
+      status.textContent = e instanceof TypeError ? "Can't reach the server. Make sure app.py is running." : e.message;
     } finally {
-      status.classList.remove("loading");
-      button.disabled = false;
+      if (myId === searchId) status.classList.remove("loading");
     }
   }
+
+  async function loadMore() {
+    const myId = searchId;
+    moreButton.disabled = true;
+    try {
+      const data = await fetchPage(currentSearch, nextPage);
+      if (myId !== searchId) return;
+      nextPage += 1;
+      showRecipes(data);
+    } catch (e) {
+      status.textContent = e.message;
+    } finally {
+      moreButton.disabled = false;
+    }
+  }
+
   button.addEventListener("click", search);
+  moreButton.addEventListener("click", loadMore);
   input.addEventListener("keydown", (e) => { if (e.key === "Enter") search(); });
+  
 </script>
 </body>
 </html>
