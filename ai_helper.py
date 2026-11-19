@@ -19,7 +19,6 @@ TRUSTED_SITES = {
     "Handle The Heat": "https://handletheheat.com",
     "Broma Bakery": "https://bromabakery.com",
     "Recipe Tin Eats": "https://www.recipetineats.com",
-    "Sugar and Sparrow": "https://sugarandsparrow.com",
     "Life, Love, and Sugar": "https://www.lifeloveandsugar.com",
     "Once Upon a Chef": "https://www.onceuponachef.com",
     "Preppy Kitchen": "https://preppykitchen.com",
@@ -148,9 +147,10 @@ def get_suggestions(ingredients):
             model="gemini-3-flash-preview",
             contents=(
                 "A home cook typed the ingredient \"" + term + "\" into a recipe search. "
-                "List up to 6 specific forms/varieties of this ingredient and what they mean."
-                "(for example, for coconut: coconut milk, coconut cream, coconut oil, shredded coconut)."
-                "Reply with a comma-separated list of the ingredient forms only (no recipes/dishes)."
+                "List up to 6 specific forms or varieties of it "
+                "(for example, for coconut: coconut milk, coconut cream, coconut oil, shredded coconut). "
+                "Reply with only a comma-separated list of ingredient names. "
+                "No recipes, dishes, or explanations."
             ),
         )
         ideas = [s.strip().lower() for s in reply.text.split(",")]
