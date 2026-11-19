@@ -65,10 +65,18 @@
   nav button span { font-size: 1.25rem; line-height: 1; }
   nav button[aria-selected="true"] { background: var(--flour); color: var(--plum); font-weight: 600; }
   @media (prefers-reduced-motion: reduce) { .loading { animation: none; } }
+
+    .about-link { position: absolute; top: calc(14px + env(safe-area-inset-top, 0px)); right: 16px; margin: 0; padding: 6px 14px; font-size: .85rem; }
+  .suggestions p { margin: 0 0 8px; font-weight: 500; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 14px; }
+  .chip, .site-link { border: 0; font: inherit; font-size: .9rem; background: var(--flour); color: var(--plum); border-radius: 999px; padding: 6px 14px; text-decoration: none; cursor: pointer; }
+  .chip:focus-visible, .site-link:focus-visible { outline: 3px solid var(--plum); outline-offset: 2px; }
+  #tab-about .chips { justify-content: flex-start; }
 </style>
 </head>
 <body>
-<main>
+  <button class="text-btn about-link" id="about-link">About</button>
+  <main>
   <section class="tab home" id="tab-home">
     <img class="logo" src="/static/logo.png" alt="Baker's Dozen logo">
     <h2>What do you want to use up?</h2>
@@ -78,12 +86,25 @@
       <button class="go" id="go">Find recipes</button>
     </div>
     <p class="status" id="status" role="status"></p>
+    <div class="suggestions" id="suggestions"></div>
     <div class="results" id="results"></div>
+    <button class="text-btn" id="more" hidden>Show more recipes</button>
   </section>
 
   <section class="tab" id="tab-favorites" hidden>
     <h2>Favorites</h2>
     <div class="list" id="favorites-list"></div>
+  </section>
+
+  <section class="tab" id="tab-about" hidden>
+    <h2>About Baker's Dozen</h2>
+    <div class="note">
+      <p>Baker's Dozen helps you use up ingredients in your kitchen! Just enter your ingredients and get links to real recipes from trusted cooking sites. Nothing is written or illustrated by AI.</p>
+      <p>Recipes are ranked by star rating and the number of rankings, including every ingredient that you typed in.</p>
+    </div>
+    <h3>Trusted sites</h3>
+    <div class="chips" id="sites-list"></div>
+    <p>Know a site we don't have? Let us know! Submissions are coming soon.</p>
   </section>
 
   <section class="tab" id="tab-history" hidden>
@@ -233,7 +254,8 @@
 
     try {
       const response = await fetch("/api/recipes?ingredients=" + encodeURIComponent(text));
-      const recipes = await response.json();
+      const data = await response.json();
+      const recipes = data.recipes || [];
       if (!response.ok) { status.textContent = recipes.error || "Something went wrong. Try again."; return; }
       if (recipes.length === 0) { status.textContent = "No recipes matched all of those ingredients. Try fewer ingredients."; return; }
 
