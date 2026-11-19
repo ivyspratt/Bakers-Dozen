@@ -165,9 +165,30 @@
     document.querySelectorAll("section.tab").forEach((s) => { s.hidden = s.id !== "tab-" + name; });
     if (name === "favorites") renderFavorites();
     if (name === "history") renderHistory();
+    if (name === "about") loadSites();
     window.scrollTo(0, 0);
   }
   tabButtons.forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
+
+    // About page: the list of sites comes from the server so it always matches TRUSTED_SITES
+  async function loadSites() {
+    const box = $("sites-list");
+    if (box.childElementCount > 0) return;
+    try {
+      const response = await fetch("/api/sites");
+      const sites = await response.json();
+      sites.forEach((site) => {
+        const link = el("a", "site-link", site.name);
+        link.href = site.url;
+        link.target = "_blank";
+        link.rel = "noopener";
+        box.append(link);
+      });
+    } catch (e) {
+      box.append(el("div", "note", "Couldn't load the site list. Make sure app.py is running."));
+    }
+  }
+  $("about-link").addEventListener("click", () => showTab("about"));
 
   // Favorites
   const isFav = (url) => store.get(KEYS.favs).some((f) => f.url === url);
